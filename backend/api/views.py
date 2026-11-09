@@ -36,21 +36,24 @@ class StandardResultsPagination(PageNumberPagination):
     page_size_query_param = 'page_size'
     max_page_size = 50
 
-def _async_send_email(subject, message, from_email, recipient, html_message, code):
-    try:
-        send_mail(
-            subject=subject,
-            message=message,
-            from_email=from_email,
-            recipient_list=[recipient],
-            html_message=html_message,
-            fail_silently=False
-        )
-        logger.info(f"Verification email successfully sent to {recipient}")
-        print(f"\n========================================\n[EMAIL DISPATCHED VIA GMAIL SMTP] To: {recipient} | Code: {code}\n========================================\n")
-    except Exception as e:
-        logger.warning(f"SMTP send failed for {recipient}: {e}")
-        print(f"\n========================================\n[SMTP WARNING] Failed to deliver to {recipient}: {e}\n[VERIFICATION CODE FALLBACK]: {code}\n========================================\n")
+def _send_portal_email(subject, message, from_email, recipient, html_message, code):
+    """
+    Sends email synchronously so serverless environments (Vercel) complete the SMTP
+    handshake before the container is frozen. Also supports fallback logging.
+    """
+    if not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD:
+        raise ValueError("EMAIL_HOST_USER or EMAIL_HOST_PASSWORD is not configured in server environment variables.")
+
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=from_email,
+        recipient_list=[recipient],
+        html_message=html_message,
+        fail_silently=False
+    )
+    logger.info(f"Verification email successfully sent to {recipient}")
+    print(f"\n========================================\n[EMAIL DISPATCHED VIA GMAIL SMTP] To: {recipient} | Code: {code}\n========================================\n")
 
 
 class SendVerificationCodeView(APIView):
@@ -115,15 +118,18 @@ Official Municipal & Barangay E-Services
 
         from_email = settings.DEFAULT_FROM_EMAIL or 'noreply@ecare.community.gov'
 
-        # Dispatch email delivery in background thread for instantaneous response
-        thread = threading.Thread(
-            target=_async_send_email,
-            args=(subject, message, from_email, email, html_message, code),
-            daemon=True
-        )
-        thread.start()
+        # Send email synchronously so serverless functions (Vercel) complete delivery before process freezes
+        try:
+            _send_portal_email(subject, message, from_email, email, html_message, code)
+        except Exception as e:
+            logger.exception(f"SMTP send failed for {email}: {e}")
+            # Release cooldown so resident can retry without waiting 60s
+            cache.delete(cooldown_key)
+            cache.delete(f"email_verify:{email}")
+            return Response({
+                'detail': f'Could not send verification email: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        # Instant 200 OK response with 0 latency
         res_payload = {
             'message': f'Verification code sent to {email}. Please check your inbox.',
             'email_sent': True
@@ -190,12 +196,15 @@ eCare Community Connect
         """
 
         from_email = settings.DEFAULT_FROM_EMAIL or 'noreply@ecare.community.gov'
-        thread = threading.Thread(
-            target=_async_send_email,
-            args=(subject, message, from_email, email, html_message, code),
-            daemon=True
-        )
-        thread.start()
+        try:
+            _send_portal_email(subject, message, from_email, email, html_message, code)
+        except Exception as e:
+            logger.exception(f"SMTP send failed for password reset {email}: {e}")
+            cache.delete(cooldown_key)
+            cache.delete(f"password_reset:{email}")
+            return Response({
+                'detail': f'Could not send password reset email: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response({
             'message': f'Password reset code sent to {email}. Please check your inbox.',

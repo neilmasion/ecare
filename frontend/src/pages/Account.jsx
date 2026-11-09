@@ -167,13 +167,16 @@ const Account = () => {
         msg = data.error;
       } else if (data?.message) {
         msg = data.message;
+      } else if (typeof data === 'string' && data.trim()) {
+        const text = data.replace(/<[^>]*>/g, '').trim();
+        msg = text.length > 200 ? text.substring(0, 200) + '...' : text;
       } else if (data && typeof data === 'object') {
         const firstKey = Object.keys(data)[0];
         const val = data[firstKey];
         if (Array.isArray(val) && val[0]) msg = val[0];
         else if (typeof val === 'string') msg = val;
       } else if (err.message === 'Network Error' || !err.response) {
-        msg = 'Backend server is offline on port 8000. Start it with npm run dev.';
+        msg = 'Backend service is unavailable. Please check your network connection.';
       }
       setErrorMessage(msg);
     } finally {
@@ -201,6 +204,9 @@ const Account = () => {
         msg = data.detail;
       } else if (data?.error) {
         msg = data.error;
+      } else if (typeof data === 'string' && data.trim()) {
+        const text = data.replace(/<[^>]*>/g, '').trim();
+        msg = text.length > 200 ? text.substring(0, 200) + '...' : text;
       }
       setErrorMessage(msg);
     } finally {
@@ -286,13 +292,19 @@ const Account = () => {
       setForgotCountdown(60);
       setSuccessMessage(`Reset code sent to ${email}. Please check your inbox!`);
     } catch (err) {
+      const data = err.response?.data;
       let msg = 'Could not send reset code. Please try again.';
-      if (err.response?.data?.email?.[0]) {
-        msg = err.response.data.email[0];
-      } else if (err.response?.data?.detail) {
-        msg = err.response.data.detail;
-      } else if (err.response?.data?.message) {
-        msg = err.response.data.message;
+      if (data?.email) {
+        msg = Array.isArray(data.email) ? data.email[0] : data.email;
+      } else if (data?.detail) {
+        msg = data.detail;
+      } else if (data?.error) {
+        msg = data.error;
+      } else if (data?.message) {
+        msg = data.message;
+      } else if (typeof data === 'string' && data.trim()) {
+        const text = data.replace(/<[^>]*>/g, '').trim();
+        msg = text.length > 200 ? text.substring(0, 200) + '...' : text;
       }
       setErrorMessage(msg);
     } finally {
