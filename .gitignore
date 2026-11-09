@@ -1,0 +1,44 @@
+# Environments & Secrets
+.env
+.env.local
+.env.*.local
+*.env
+backend/.env
+
+# Python & Django
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite3
+*.db
+media/
+staticfiles/
+backend/staticfiles/
+backend/media/
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Node & Frontend
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+.vite/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Operating System
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+*.bak
+
+# IDE & Editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
